@@ -1,0 +1,47 @@
+# Code Quality Rules
+# ==================
+# These rules catch common bugs and quality issues:
+# - Mutable default arguments (classic Python bug)
+# - Print statements (use logging instead)
+
+rules:
+  # ============================================================
+  # BUG PREVENTION
+  # ============================================================
+
+  - id: no-mutable-default-arg
+    patterns:
+      - pattern: "def $FUNC(..., $ARG=[], ...): ..."
+      - pattern: "def $FUNC(..., $ARG={}, ...): ..."
+    message: |
+      [X] Mutable default argument
+
+      Mutable defaults are shared between calls - classic bug.
+
+      Fix: def $FUNC(..., $ARG=None, ...):
+               if $ARG is None:
+                   $ARG = []
+    languages: [python]
+    severity: ERROR
+
+  # ============================================================
+  # CODE HYGIENE
+  # ============================================================
+
+  - id: no-print-statements
+    patterns:
+      - pattern: print(...)
+    paths:
+      exclude:
+        - "**/test_*.py"
+        - "**/tests/**"
+        - "**/conftest.py"
+        - "scripts/**"
+    message: |
+      [!] print() detected - use logging instead
+
+      import logging
+      logger = logging.getLogger(__name__)
+      logger.info("message")
+    languages: [python]
+    severity: WARNING

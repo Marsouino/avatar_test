@@ -1,0 +1,43 @@
+# Testing Rules
+# =============
+# These rules ensure tests are meaningful:
+# - No tests with only `assert True` or `pass`
+
+rules:
+  # ============================================================
+  # MEANINGFUL TESTS
+  # ============================================================
+
+  # Detect tests that only assert True (not meaningful)
+  - id: no-assert-true-only
+    pattern: assert True
+    paths:
+      include:
+        - "**/test_*.py"
+        - "**/tests/**"
+    message: |
+      [X] Meaningless assertion: 'assert True'
+
+      Tests must verify actual behavior, not just pass:
+
+      result = function_under_test(input)
+      assert result == expected_value
+    languages: [python]
+    severity: WARNING
+
+  # Detect tests that just pass (placeholder)
+  - id: no-pass-only-test
+    pattern-inside: |
+      def test_$NAME(...):
+          ...
+    pattern: pass
+    paths:
+      include:
+        - "**/test_*.py"
+        - "**/tests/**"
+    message: |
+      [X] Empty test (only 'pass')
+
+      Tests must verify actual behavior, not be empty placeholders.
+    languages: [python]
+    severity: WARNING

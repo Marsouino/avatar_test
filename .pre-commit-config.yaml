@@ -1,0 +1,114 @@
+# Pre-commit hooks for enforcing code quality and philosophy
+# Install: .\scripts\init_project.ps1 (handles everything)
+# Run manually: python scripts/run_policy_tool.py pre-commit run --all-files
+#
+# All local hooks use venv_policy/ via scripts/run_policy_tool.py (cross-platform).
+# This ensures tools are always available regardless of project venv state.
+
+repos:
+  # ============================================================
+  # RUFF - Fast Python linter (replaces flake8, isort, etc.)
+  # ============================================================
+  - repo: https://github.com/astral-sh/ruff-pre-commit
+    rev: v0.4.0
+    hooks:
+      - id: ruff
+        args: [--fix, --exit-non-zero-on-fix]
+        exclude: '^(scripts/.*\.py)$'
+      - id: ruff-format
+        exclude: '^(scripts/.*\.py)$'
+
+  # ============================================================
+  # SEMGREP - Custom philosophy rules (via venv_policy)
+  # ============================================================
+  - repo: local
+    hooks:
+      - id: semgrep
+        name: Semgrep Philosophy Rules
+        entry: python scripts/run_policy_tool.py semgrep --config=.semgrep/rules/ src/ tests/ --error --quiet --metrics=off
+        language: system
+        types: [python]
+        pass_filenames: false
+
+  # ============================================================
+  # NOTE: Mypy is NOT run in pre-commit.
+  # Mypy needs to resolve import types from project/module dependencies.
+  # In multi-venv architectures, it must run per-module (like pytest).
+  # Use: python scripts/run_all_tests.py (runs mypy + pytest per module)
+  # ============================================================
+
+  # ============================================================
+  # STANDARD HOOKS
+  # ============================================================
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v4.5.0
+    hooks:
+      # Prevent large files
+      - id: check-added-large-files
+        args: ['--maxkb=1000']
+
+      # Syntax checks
+      - id: check-yaml
+        exclude: '^\.semgrep/.*'  # Semgrep YAML uses special syntax
+      - id: check-json
+      - id: check-toml
+
+      # Cleanup — exclude sacred files (read-only → PermissionError otherwise)
+      # Pattern covers: .github/*, .semgrep/*, .cursor/rules/*, config/*, scripts/*.py,
+      # plus individual sacred files. See .github/sacred-files.yml for full list.
+      - id: trailing-whitespace
+        exclude: '^(\.github/.*|\.semgrep/.*|\.cursor/rules/.*|config/.*|scripts/.*\.py|\.pre-commit-config\.yaml|pyproject\.toml|tests/conftest\.py)$'
+      - id: end-of-file-fixer
+        exclude: '^(\.github/.*|\.semgrep/.*|\.cursor/rules/.*|config/.*|scripts/.*\.py|\.pre-commit-config\.yaml|pyproject\.toml|tests/conftest\.py)$'
+      - id: mixed-line-ending
+
+      # Python specific
+      - id: check-ast  # Verify Python syntax
+      - id: debug-statements  # No print/pdb left behind
+
+  # ============================================================
+  # BYPASS COMMENT DETECTOR (nosemgrep, blanket noqa, etc.)
+  # ============================================================
+  # Semgrep CANNOT detect # nosemgrep (it respects the directive).
+  # This script uses text search to catch bypass comments.
+  - repo: local
+    hooks:
+      - id: check-nosemgrep
+        name: Bypass Comment Detector
+        entry: python scripts/run_policy_tool.py python scripts/check_nosemgrep.py src/
+        language: system
+        pass_filenames: false
+        types: [python]
+
+  # ============================================================
+  # CUSTOM FAIL-FAST CHECKER (via venv_policy)
+  # ============================================================
+  - repo: local
+    hooks:
+      - id: check-fail-fast
+        name: Fail-Fast Patterns
+        entry: python scripts/run_policy_tool.py python scripts/check_fail_fast.py src/
+        language: system
+        pass_filenames: false
+        types: [python]
+
+  # ============================================================
+  # TEST COUNT RATCHET (AST-based, no imports, venv_policy)
+  # ============================================================
+  - repo: local
+    hooks:
+      - id: test-count-ratchet
+        name: Test Count Ratchet
+        entry: python scripts/run_policy_tool.py python scripts/check_test_count.py
+        language: system
+        pass_filenames: false
+        types: [python]
+        stages: [pre-commit]
+
+  # ============================================================
+  # NOTE: Unit tests are NOT run in pre-commit.
+  # In multi-venv architectures, each module's tests run in its own venv.
+  # Use: python scripts/run_all_tests.py
+  # Or:  python scripts/run_all_tests.py --module core
+  # Full test suites should run in CI or before merge.
+  # ============================================================

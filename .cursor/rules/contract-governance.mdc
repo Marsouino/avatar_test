@@ -1,0 +1,120 @@
+# Contract & Sacred Files Governance
+
+## Ownership Model
+
+**Human owns the contracts and sacred files. AI implements code to satisfy them.**
+
+```
+Human: Defines WHAT the system should do (contracts)
+AI:    Implements HOW (code that passes contracts)
+```
+
+## Sacred Files
+
+These files are **protected** and verified by CI.
+
+**→ See `.github/sacred-files.yml` for the complete list.**
+
+### MANDATORY RULES for sacred files
+
+1. **Never modify, move, rename, or delete** these files without approval
+2. **Never change their permissions** (chmod, attrib, icacls, etc.)
+3. If a modification is necessary:
+   - Explain **what modification** would be needed
+   - Give an example command or diff **as text**
+   - Say: "You must run `scripts/unlock-governance`, apply the change, then `scripts/lock-governance`."
+
+## Before ANY Implementation
+
+### Step 1: Impact Analysis (MANDATORY)
+
+List files that will be modified:
+
+```
+To implement [X], I will modify:
+- path/to/new_file.py (new)
+- path/to/existing.py (modification)
+- tests/path/test_file.py ⚠️ CONTRACT
+```
+
+### Step 2: If Contract File Affected → STOP
+
+```
+⚠️ CONTRACT AFFECTED: [contract name]
+
+Proposed change:
+    BEFORE: [current signature/behavior]
+    AFTER: [proposed signature/behavior]
+
+Reason: [why this change is necessary]
+
+Do you approve this contract change?
+```
+
+### Step 3: Wait for Explicit Approval
+
+- "Yes" → Proceed
+- "No" → Find alternative approach
+- No response → Do NOT proceed
+
+## Test Markers (Tags)
+
+Any modification of pytest markers (`@pytest.mark.*`) is a contract change
+because it affects which tests run and when.
+
+### Markers requiring explicit approval
+
+- `@pytest.mark.skip` / `@pytest.mark.xfail` - Disables the test
+- Removal of any existing marker
+
+### Before modifying a marker → STOP
+
+```
+⚠️ MARKER MODIFIED: [test file]
+
+Change:
+    BEFORE: [no marker / @pytest.mark.X]
+    AFTER: [@pytest.mark.Y]
+
+Impact: [when this test will run now]
+
+Do you approve this marker change?
+```
+
+## FORBIDDEN
+
+- Modifying tests to make failing code "pass"
+- Changing contracts without explicit approval
+- Burying contract changes in large commits
+- Assuming silence = approval
+- Using `git commit --no-verify` without explicit approval
+
+## Pre-commit Bypass (`--no-verify`)
+
+`--no-verify` bypasses ALL pre-commit hooks (ruff, semgrep, tests).
+This is a total governance bypass.
+
+### Before using `--no-verify` → STOP
+
+```
+⚠️ PRE-COMMIT BYPASS REQUESTED
+
+Reason: [why hooks cannot pass]
+Impact: [which controls will be bypassed]
+Alternative attempted: [what was tried before]
+
+Do you approve using --no-verify?
+```
+
+### Rules
+
+1. Always try to fix the problem first (fix code, fix deps)
+2. Never use `--no-verify` to "save time"
+3. Wait for explicit approval before running the command
+
+## Commit Strategy
+
+If contract changes are approved:
+1. Commit contract changes SEPARATELY
+2. Clear commit message: `refactor(contract): [description]`
+3. Then commit implementation

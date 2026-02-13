@@ -1,0 +1,336 @@
+# Fail-Fast Rules
+# ================
+# These rules enforce the fail-fast principle:
+# - Zero silent fallback (no masking missing values)
+# - Zero exception swallowing (no hiding errors)
+#
+# Errors must be visible immediately, not hidden.
+
+rules:
+  # ============================================================
+  # ZERO SILENT FALLBACK
+  # ============================================================
+
+  - id: no-dict-get-with-default
+    patterns:
+      - pattern: $DICT.get($KEY, $DEFAULT)
+    message: |
+      [X] Silent fallback: $DICT.get($KEY, $DEFAULT)
+
+      Use direct access: value = $DICT[$KEY]
+      Or validate: if $KEY not in $DICT: raise ValueError(...)
+    languages: [python]
+    severity: ERROR
+
+  - id: no-dict-pop-with-default
+    patterns:
+      - pattern: $DICT.pop($KEY, $DEFAULT)
+    message: |
+      [X] Silent fallback: $DICT.pop($KEY, $DEFAULT)
+
+      Validate key exists before pop, or use direct access.
+    languages: [python]
+    severity: ERROR
+
+  - id: no-dict-setdefault
+    patterns:
+      - pattern: $DICT.setdefault($KEY, $DEFAULT)
+    message: |
+      [X] Silent fallback: $DICT.setdefault($KEY, $DEFAULT)
+
+      This masks missing keys AND mutates silently.
+    languages: [python]
+    severity: ERROR
+
+  - id: no-os-getenv-default
+    patterns:
+      - pattern: os.getenv($KEY, $DEFAULT)
+      - pattern: os.environ.get($KEY, $DEFAULT)
+    message: |
+      [X] Silent fallback for env var: $KEY
+
+      Use: os.environ[$KEY] or validate explicitly.
+    languages: [python]
+    severity: ERROR
+
+  - id: no-next-with-default
+    patterns:
+      - pattern: next($ITER, $DEFAULT)
+    message: |
+      [X] Silent fallback: next(..., $DEFAULT)
+
+      Let StopIteration raise or handle explicitly.
+    languages: [python]
+    severity: ERROR
+
+  - id: no-getattr-with-default
+    patterns:
+      - pattern: getattr($OBJ, $ATTR, $DEFAULT)
+    message: |
+      [X] Silent fallback: getattr($OBJ, $ATTR, $DEFAULT)
+
+      Use direct access: $OBJ.$ATTR
+    languages: [python]
+    severity: ERROR
+
+  - id: no-hasattr-with-fallback
+    pattern-either:
+      - pattern: |
+          if hasattr($OBJ, $ATTR):
+            ...
+          else:
+            $X = $DEFAULT
+      - pattern: |
+          if hasattr($OBJ, $ATTR):
+            return $OBJ.$ATTR
+          else:
+            return $DEFAULT
+      - pattern: $OBJ.$ATTR if hasattr($OBJ, $ATTR) else $DEFAULT
+      - pattern: $VAR if hasattr($OBJ, $ATTR) else $DEFAULT
+    message: |
+      [X] hasattr() with fallback detected
+
+      Use direct access: value = $OBJ.$ATTR
+    languages: [python]
+    severity: ERROR
+
+  - id: no-dict-get-without-default
+    patterns:
+      - pattern: $DICT.get($KEY)
+    message: |
+      [X] .get() returns None implicitly
+
+      Use direct access: $DICT[$KEY]
+    languages: [python]
+    severity: ERROR
+
+  - id: no-ternary-in-else-fallback
+    patterns:
+      - pattern: $DICT[$KEY] if $KEY in $DICT else $DEFAULT
+    message: |
+      [X] Silent fallback via ternary
+
+      Use direct access: $DICT[$KEY]
+    languages: [python]
+    severity: ERROR
+
+  - id: no-or-default-pattern
+    pattern-either:
+      - pattern: $X = $VAR or "..."
+      - pattern: $X = $VAR or 0
+      - pattern: $X = $VAR or []
+      - pattern: $X = $VAR or {}
+      - pattern: $X = $VAR or None
+      - pattern: $X = $VAR or False
+      - pattern: return $VAR or "..."
+      - pattern: return $VAR or 0
+      - pattern: return $VAR or []
+      - pattern: return $VAR or {}
+      - pattern: return $VAR or None
+      - pattern: return $VAR or False
+    paths:
+      exclude:
+        - "**/test_*.py"
+        - "**/tests/**"
+        - "**/conftest.py"
+    message: |
+      [X] Silent fallback with 'or'
+
+      Validate explicitly: if not value: raise ValueError(...)
+    languages: [python]
+    severity: ERROR
+
+  - id: no-ternary-none-fallback
+    patterns:
+      - pattern: $X = $Y if $Y is not None else $DEFAULT
+      - pattern: return $Y if $Y is not None else $DEFAULT
+    message: |
+      [X] Silent fallback via None ternary
+
+      Validate: if $Y is None: raise ValueError(...)
+    languages: [python]
+    severity: ERROR
+
+  - id: no-none-default-assignment
+    patterns:
+      - pattern: |
+          if $X is None:
+              $X = $DEFAULT
+      - pattern: |
+          if not $X:
+              $X = $DEFAULT
+    message: |
+      [X] Silent fallback via None assignment
+
+      Validate: if $X is None: raise ValueError(...)
+    languages: [python]
+    severity: ERROR
+
+  - id: no-get-then-none-fallback
+    patterns:
+      - pattern: |
+          $X = $DICT.get($KEY)
+          ...
+          if $X is None:
+              $X = $DEFAULT
+      - pattern: |
+          $X = $DICT.get($KEY)
+          ...
+          if not $X:
+              $X = $DEFAULT
+    message: |
+      [X] Silent fallback via .get() + None check
+
+      Use direct access: $DICT[$KEY]
+    languages: [python]
+    severity: ERROR
+
+  - id: no-if-in-return-fallback
+    patterns:
+      - pattern: |
+          if $KEY in $DICT:
+              return $DICT[$KEY]
+          return $DEFAULT
+      - pattern: |
+          if $KEY in $DICT:
+              $X = $DICT[$KEY]
+          else:
+              $X = $DEFAULT
+    message: |
+      [X] Silent fallback via if-in-else
+
+      Use direct access: return $DICT[$KEY]
+    languages: [python]
+    severity: ERROR
+
+  - id: no-defaultdict
+    patterns:
+      - pattern: defaultdict($DEFAULT)
+    message: |
+      [X] defaultdict creates values silently
+
+      Use regular dict with explicit key validation.
+    languages: [python]
+    severity: ERROR
+
+  - id: no-kwargs-get
+    patterns:
+      - pattern: kwargs.get($KEY)
+      - pattern: kwargs.get($KEY, $DEFAULT)
+    message: |
+      [X] kwargs.get() masks missing parameters
+
+      Use explicit parameters in function signature instead of **kwargs.
+      Or validate: if $KEY not in kwargs: raise ValueError(...)
+    languages: [python]
+    severity: ERROR
+
+  - id: no-conditional-fallback
+    patterns:
+      - pattern: $X = $X if $X else $DEFAULT
+      - pattern: $X = $Y if $Y else $DEFAULT
+    message: |
+      [X] Conditional fallback detected
+
+      Validate explicitly: if not $X: raise ValueError(...)
+    languages: [python]
+    severity: ERROR
+    paths:
+      exclude:
+        - "**/test_*.py"
+        - "**/tests/**"
+
+  # ============================================================
+  # ZERO EXCEPTION SWALLOWING
+  # ============================================================
+
+  - id: no-bare-except
+    patterns:
+      - pattern: |
+          try:
+              ...
+          except:
+              ...
+    message: |
+      [X] Bare except swallows all errors
+
+      Use specific exception: except SpecificError as e:
+    languages: [python]
+    severity: ERROR
+
+  - id: no-broad-except-pass
+    pattern-either:
+      - pattern: |
+          try:
+            ...
+          except Exception:
+            pass
+      - pattern: |
+          try:
+            ...
+          except Exception as $E:
+            pass
+      - pattern: |
+          try:
+            ...
+          except BaseException:
+            pass
+      - pattern: |
+          try:
+            ...
+          except BaseException as $E:
+            pass
+    message: |
+      [X] Exception swallowed with pass
+
+      Handle specifically or re-raise with context.
+    languages: [python]
+    severity: ERROR
+
+  - id: no-except-return-default
+    pattern-either:
+      - pattern: |
+          try:
+            ...
+          except:
+            return $DEFAULT
+      - pattern: |
+          try:
+            ...
+          except $EXC:
+            return $DEFAULT
+      - pattern: |
+          try:
+            ...
+          except $EXC as $E:
+            return $DEFAULT
+    message: |
+      [X] Exception caught, default returned
+
+      Let exception propagate or re-raise with context.
+    languages: [python]
+    severity: ERROR
+
+  - id: no-except-assign-default
+    pattern-either:
+      - pattern: |
+          try:
+            ...
+          except:
+            $X = $DEFAULT
+      - pattern: |
+          try:
+            ...
+          except $EXC:
+            $X = $DEFAULT
+      - pattern: |
+          try:
+            ...
+          except $EXC as $E:
+            $X = $DEFAULT
+    message: |
+      [X] Exception caught, default assigned
+
+      Let exception propagate or re-raise with context.
+    languages: [python]
+    severity: ERROR

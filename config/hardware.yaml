@@ -1,0 +1,116 @@
+# Hardware & Infrastructure Configuration
+# ========================================
+# Source of truth for GPU/CUDA versions, network, and storage across environments.
+# Referenced by docs/ai_codev/AI_REFRESH.md — read BEFORE any install or infra work.
+#
+# INSTRUCTIONS: Update values when infrastructure changes.
+
+environments:
+  local:
+    name: "Local Development"
+    os: "Windows 11"
+    gpu:
+      model: "NVIDIA GeForce RTX 5090"
+      architecture: "Blackwell"
+      compute_capability: "sm_120"
+      vram_gb: 24
+    cuda:
+      version: "12.9"
+      driver: "577.05"
+    python: "3.13"
+    pytorch:
+      version: "2.10.0"
+      install: "pip install torch==2.10.0 torchvision torchaudio"
+
+  dgx_40:
+    name: "DGX #1"
+    os: "Ubuntu Linux"
+    gpu:
+      model: "NVIDIA GB10 (Grace Blackwell)"
+      architecture: "Blackwell"
+      compute_capability: "sm_100"
+      vram_gb: 128  # Unified memory
+    cuda:
+      version: "13.0"
+    python: "3.11"  # In container
+
+    containers:
+      pytorch: "nvcr.io/nvidia/pytorch:25.09-py3"
+
+    pytorch:
+      version: "2.9"
+      source: "pre-installed in NVIDIA container"
+
+    network:
+      ip: "192.168.86.40"
+      ssh_port: 22
+      ssh_user: "tech3admin"
+      ports:
+        fastapi: 8000
+        comfyui: 8188
+
+    container:
+      runtime: "docker"
+      launch: "docker run -d --gpus all --name nike_container --restart=always --ipc=host --ulimit memlock=-1 --ulimit stack=67108864 -e PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True -p 8000:8000 -p 8188:8188 -v /home/tech3admin/nike_v2:/workspace/nike_v2 nvcr.io/nvidia/pytorch:25.09-py3 tail -f /dev/null"
+
+    warnings:
+      - "NEVER pip install torch — will overwrite CUDA-optimized version in container"
+      - "ALWAYS work inside NVIDIA container"
+      - "Use PIP_CONSTRAINT to protect PyTorch"
+      - "torchaudio NOT supported on CUDA 13 / GB10"
+
+  dgx_38:
+    name: "DGX #2"
+    os: "Ubuntu Linux"
+    gpu:
+      model: "NVIDIA GB10 (Grace Blackwell)"
+      architecture: "Blackwell"
+      compute_capability: "sm_100"
+      vram_gb: 128  # Unified memory
+    cuda:
+      version: "13.0"
+    python: "3.11"  # In container
+
+    containers:
+      pytorch: "nvcr.io/nvidia/pytorch:25.09-py3"
+
+    pytorch:
+      version: "2.9"
+      source: "pre-installed in NVIDIA container"
+
+    network:
+      ip: "192.168.86.38"
+      ssh_port: 22
+      ssh_user: "tech3admin"
+
+    warnings:
+      - "NEVER pip install torch — will overwrite CUDA-optimized version in container"
+      - "ALWAYS work inside NVIDIA container"
+      - "torchaudio NOT supported on CUDA 13 / GB10"
+
+# PyTorch requirements (cross-environment)
+pytorch:
+  min_version: "2.10.0"
+  reason: "Required for Blackwell GPU support (sm_120)"
+
+  # Local installation command
+  local_install: "pip install torch==2.10.0 torchvision torchaudio"
+
+  # DGX — DO NOT INSTALL, use container
+  dgx_install: null  # Pre-installed in nvcr.io/nvidia/pytorch:25.09-py3
+
+# Packages known to work with this setup
+compatible_packages:
+  - name: "torch"
+    version: "==2.10.0"
+  - name: "pydantic"
+    version: ">=2.0"
+  - name: "beartype"
+    version: ">=0.18.0"
+
+# Packages with known issues on your hardware
+incompatible_packages:
+  - name: "torch<2.9"
+    reason: "No Blackwell (sm_120) support"
+  - name: "torchaudio (on DGX)"
+    reason: "Not supported with CUDA 13 on GB10"

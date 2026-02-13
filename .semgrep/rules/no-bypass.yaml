@@ -1,0 +1,142 @@
+rules:
+  # =============================================================================
+  # GOVERNANCE PROTECTION - Detects bypass attempts
+  # =============================================================================
+  # These rules detect attempts to bypass code quality checks.
+  # Legitimate exceptions require explicit approval and documentation.
+  # =============================================================================
+
+  # ---------------------------------------------------------------------------
+  # SEMGREP BYPASS
+  # ---------------------------------------------------------------------------
+  - id: no-nosemgrep-bypass
+    pattern-regex: '#\s*nosemgrep'
+    message: |
+      [X] Unauthorized bypass: # nosemgrep
+
+      This comment disables Semgrep rules and requires approval.
+      See: .cursor/rules/contract-governance.mdc
+    languages: [python]
+    severity: ERROR
+    paths:
+      exclude:
+        - docs/**
+        - "*.md"
+
+  # ---------------------------------------------------------------------------
+  # SUSPICIOUS NOQA ON VIOLATION PATTERNS
+  # These detect # noqa specifically on lines that look like violations
+  # ---------------------------------------------------------------------------
+  - id: no-noqa-on-dict-get
+    pattern-regex: '\.get\s*\([^)]+,[^)]+\).*#.*noqa'
+    message: |
+      [X] Suspicious bypass: .get() with # noqa
+
+      This looks like an attempt to silence a linter warning on a silent fallback.
+      Remove the .get() pattern instead of silencing the warning.
+    languages: [python]
+    severity: ERROR
+
+  - id: no-noqa-on-or-fallback
+    pattern-regex: "\\sor\\s+[\"'\\[\\{0-9].*#.*noqa"
+    message: |
+      [X] Suspicious bypass: 'or' fallback with # noqa
+
+      This looks like an attempt to silence a warning on a silent fallback.
+      Remove the 'or' pattern instead of silencing the warning.
+    languages: [python]
+    severity: ERROR
+
+  - id: no-noqa-on-getattr
+    pattern-regex: 'getattr\s*\([^)]+,[^)]+,[^)]+\).*#.*noqa'
+    message: |
+      [X] Suspicious bypass: getattr() with default and # noqa
+
+      This looks like an attempt to silence a warning on a silent fallback.
+      Remove the getattr() default instead of silencing the warning.
+    languages: [python]
+    severity: ERROR
+
+  - id: no-noqa-on-except
+    pattern-regex: 'except.*:.*#.*noqa'
+    message: |
+      [X] Suspicious bypass: except with # noqa
+
+      This looks like an attempt to silence a warning on exception handling.
+      Fix the exception handling instead of silencing the warning.
+    languages: [python]
+    severity: ERROR
+
+  # ---------------------------------------------------------------------------
+  # TYPE IGNORE ON SUSPICIOUS PATTERNS
+  # ---------------------------------------------------------------------------
+  - id: no-type-ignore-on-dict-get
+    pattern-regex: '\.get\s*\([^)]+\).*#.*type:\s*ignore'
+    message: |
+      [X] Suspicious bypass: .get() with # type: ignore
+
+      This may be hiding a type error related to silent fallback.
+      Use direct dict access: dict[key]
+    languages: [python]
+    severity: WARNING
+
+  - id: no-type-ignore-on-getattr
+    pattern-regex: 'getattr\s*\([^)]+\).*#.*type:\s*ignore'
+    message: |
+      [X] Suspicious bypass: getattr() with # type: ignore
+
+      This may be hiding a type error related to attribute access.
+      Use direct attribute access: obj.attr
+    languages: [python]
+    severity: WARNING
+
+  # ---------------------------------------------------------------------------
+  # BLANKET DISABLE COMMENTS
+  # These disable entire categories of checks - always suspicious
+  # ---------------------------------------------------------------------------
+  - id: no-pylint-disable-all
+    pattern-regex: '#\s*pylint:\s*disable\s*=\s*all'
+    message: |
+      [X] Blanket pylint disable detected
+
+      Disabling all pylint checks is not allowed.
+      Disable specific rules if absolutely necessary.
+    languages: [python]
+    severity: ERROR
+
+  - id: no-flake8-noqa-all
+    pattern-regex: '#\s*noqa\s*$'
+    message: |
+      [!] Blanket # noqa without specific codes
+
+      Use specific codes: # noqa: E501, W503
+      Blanket noqa hides all warnings on the line.
+    languages: [python]
+    severity: WARNING
+    paths:
+      exclude:
+        - "**/test_*.py"
+        - "**/conftest.py"
+
+  # ---------------------------------------------------------------------------
+  # PRAGMA NO COVER ON SUSPICIOUS CODE
+  # ---------------------------------------------------------------------------
+  - id: no-pragma-nocover-on-except
+    pattern-regex: 'except.*:.*#.*pragma:\s*no\s*cover'
+    message: |
+      [X] Suspicious: exception handler excluded from coverage
+
+      Exception handling should be tested, not excluded.
+      Write tests that trigger this exception path.
+    languages: [python]
+    severity: WARNING
+
+  - id: no-pragma-nocover-on-validation
+    pattern-regex: 'raise\s+\w+Error.*#.*pragma:\s*no\s*cover'
+    message: |
+      [X] Suspicious: validation error excluded from coverage
+
+      Validation errors should be tested with fail-fast tests.
+      Write tests that verify this error is raised.
+    languages: [python]
+    severity: WARNING

@@ -1,0 +1,198 @@
+# Continuous Validation - Validate As You Go
+#
+# MODEL "CONTINUOUS" for agile R&D:
+# - Each push: Ultra-fast validation (< 1 min)
+# - PR to main: Complete validation
+#
+# You push, you know immediately if it's OK.
+
+name: Continuous Validation
+
+on:
+  push:
+    branches: ['**']  # ALL pushes, all branches
+  pull_request:
+    branches: [main]  # Complete validation only for main
+
+jobs:
+  # ============================================================
+  # CONTINUOUS VALIDATION - On EVERY push (< 1 min)
+  # ============================================================
+  continuous:
+    name: "Quick (< 1 min)"
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: 'pip'
+
+      - name: Install (cached)
+        run: |
+          pip install -r requirements.txt pytest pytest-timeout ruff semgrep --quiet
+
+      - name: Ruff (lint + format)
+        run: |
+          ruff check src/ tests/ --quiet
+          ruff format --check src/ tests/ --quiet
+
+      - name: Semgrep
+        run: |
+          semgrep --config .semgrep/rules/ \
+            --error --quiet src/ tests/
+        env:
+          SEMGREP_SEND_METRICS: "off"
+
+      - name: Bypass comment detector
+        run: |
+          python scripts/check_nosemgrep.py src/
+
+      - name: Critical tests only
+        run: |
+          pytest tests/unit/ -x --tb=line -q --timeout=30
+        timeout-minutes: 2
+
+  # ============================================================
+  # COMPLETE VALIDATION - Only PR to main
+  # ============================================================
+  full:
+    name: "Full (main only)"
+    runs-on: ubuntu-latest
+    if: github.event_name == 'pull_request' && github.base_ref == 'main'
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0  # Needed for git diff/checkout against origin/main
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: 'pip'
+
+      - name: Install all
+        run: |
+          pip install -r requirements.txt pytest pytest-cov pytest-timeout semgrep ruff mypy --quiet
+
+      - name: Semgrep
+        run: |
+          semgrep --config .semgrep/rules/ \
+            --error --quiet src/ tests/
+        env:
+          SEMGREP_SEND_METRICS: "off"
+
+      - name: Style
+        run: |
+          ruff check src/ tests/ --quiet
+          ruff format --check src/ tests/ --quiet
+
+      - name: Type check
+        run: |
+          mypy src/ tests/ --config-file pyproject.toml
+
+      # ---- CONTRACT CHECKS ----
+
+      - name: No new skip markers
+        run: |
+          SKIP_ADDED=$(git diff origin/main...HEAD -- 'tests/**/*.py' | grep -E '^\+.*@pytest\.mark\.(skip|xfail)' || true)
+          if [ -n "$SKIP_ADDED" ]; then
+            echo "❌ New skip/xfail markers detected:"
+            echo "$SKIP_ADDED"
+            echo ""
+            echo "Skipping tests requires explicit approval."
+            exit 1
+          fi
+          echo "✅ No new skip markers"
+
+      - name: Test count (no decrease)
+        run: |
+          # Count tests on main
+          git stash --quiet || true
+          git checkout origin/main --quiet
+          MAIN_COUNT=$(pytest tests/ --collect-only -q 2>/dev/null | tail -1 | grep -oE '[0-9]+' | head -1 || echo "0")
+          git checkout - --quiet
+          git stash pop --quiet 2>/dev/null || true
+
+          # Count tests on current branch
+          CURRENT_COUNT=$(pytest tests/ --collect-only -q 2>/dev/null | tail -1 | grep -oE '[0-9]+' | head -1 || echo "0")
+
+          echo "Tests on main: $MAIN_COUNT"
+          echo "Tests on branch: $CURRENT_COUNT"
+
+          if [ "$CURRENT_COUNT" -lt "$MAIN_COUNT" ]; then
+            echo "❌ Test count decreased from $MAIN_COUNT to $CURRENT_COUNT"
+            echo "Removing tests requires explicit approval."
+            exit 1
+          fi
+          echo "✅ Test count OK ($CURRENT_COUNT >= $MAIN_COUNT)"
+
+      - name: Fail-fast test count (no decrease)
+        run: |
+          # Count fail_fast tests on main
+          git stash --quiet || true
+          git checkout origin/main --quiet
+          MAIN_FF=$(pytest tests/ -m fail_fast --collect-only -q 2>/dev/null | tail -1 | grep -oE '[0-9]+' | head -1 || echo "0")
+          git checkout - --quiet
+          git stash pop --quiet 2>/dev/null || true
+
+          # Count fail_fast tests on current branch
+          CURRENT_FF=$(pytest tests/ -m fail_fast --collect-only -q 2>/dev/null | tail -1 | grep -oE '[0-9]+' | head -1 || echo "0")
+
+          echo "Fail-fast tests on main: $MAIN_FF"
+          echo "Fail-fast tests on branch: $CURRENT_FF"
+
+          if [ "$CURRENT_FF" -lt "$MAIN_FF" ]; then
+            echo "❌ Fail-fast test count decreased from $MAIN_FF to $CURRENT_FF"
+            echo "Removing fail-fast tests requires explicit approval."
+            exit 1
+          fi
+          echo "✅ Fail-fast test count OK ($CURRENT_FF >= $MAIN_FF)"
+
+      - name: All tests with coverage
+        run: |
+          pytest tests/ --cov=src --cov-report=term-missing --tb=short -q
+
+  # ============================================================
+  # SACRED FILES PROTECTION - Only PR to main
+  # ============================================================
+  sacred:
+    name: "Sacred files"
+    runs-on: ubuntu-latest
+    if: github.event_name == 'pull_request' && github.base_ref == 'main'
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Check
+        run: |
+          # Read sacred files from single source of truth
+          SACRED=$(grep -oP '^\s+-\s+\K[^\s#]+' .github/sacred-files.yml)
+
+          if [ -z "$SACRED" ]; then
+            echo "❌ Could not parse .github/sacred-files.yml"
+            exit 1
+          fi
+
+          CHANGED=$(git diff --name-only origin/main...HEAD)
+          BLOCKED=""
+
+          for sacred_file in $SACRED; do
+            # Check exact file match or directory prefix match
+            if echo "$CHANGED" | grep -qE "^${sacred_file}(/|$)"; then
+              BLOCKED="$BLOCKED\n  - $sacred_file"
+            fi
+          done
+
+          if [ -n "$BLOCKED" ]; then
+            echo "❌ Sacred files modified:"
+            echo -e "$BLOCKED"
+            echo ""
+            echo "These files require explicit approval."
+            echo "See .github/sacred-files.yml for the complete list."
+            exit 1
+          fi
+          echo "✅ No sacred files modified"

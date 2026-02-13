@@ -1,0 +1,80 @@
+# Sacred Files - Files protected by governance
+#
+# These files CANNOT be modified without explicit approval.
+# The workflow policy-enforcement.yml automatically verifies.
+#
+# To modify a sacred file:
+# 1. Create an issue explaining the need
+# 2. Create a DEDICATED PR (not mixed with functional code)
+# 3. Get approval from the project owner
+# 4. Owner can merge manually with bypass if necessary
+
+# =============================================================================
+# GOVERNANCE RULES
+# =============================================================================
+governance_rules:
+  # Semgrep rules - define what is forbidden
+  - .semgrep/rules/fail-fast.yaml
+  - .semgrep/rules/code-clarity.yaml
+  - .semgrep/rules/code-quality.yaml
+  - .semgrep/rules/testing.yaml
+  - .semgrep/rules/no-bypass.yaml
+
+  # Cursor rules - documentation for AI
+  - .cursor/rules/philosophy.mdc
+  - .cursor/rules/contract-governance.mdc
+  - .cursor/rules/infrastructure.mdc
+
+# =============================================================================
+# INFRASTRUCTURE CONFIGURATION
+# =============================================================================
+infrastructure:
+  - config/hardware.yaml           # GPU/CUDA versions - DO NOT CHANGE
+
+# =============================================================================
+# PROJECT CONFIGURATION
+# =============================================================================
+project_config:
+  - pyproject.toml               # Python/tools config
+  - tests/conftest.py            # Shared pytest fixtures
+
+# =============================================================================
+# ENFORCEMENT SCRIPTS (policy as code)
+# =============================================================================
+enforcement_scripts:
+  - scripts/check_fail_fast.py       # Custom linter for fail-fast patterns
+  - scripts/check_nosemgrep.py       # Detects nosemgrep bypass comments
+  - scripts/check_test_count.py      # Test count ratchet (AST-based)
+  - scripts/validate_setup.py        # Project setup validator
+  - scripts/run_policy_tool.py       # Cross-platform venv_policy wrapper
+  - scripts/run_all_tests.py         # Multi-venv test runner
+  - scripts/test_policy.py           # Semgrep rules violation tests
+
+# =============================================================================
+# META-PROTECTION (protection of protections)
+# =============================================================================
+meta_protection:
+  # The workflow itself is sacred
+  - .github/workflows/policy-enforcement.yml
+
+  # This list is sacred
+  - .github/sacred-files.yml
+
+  # Pre-commit config
+  - .pre-commit-config.yaml
+
+# =============================================================================
+# RATIONALE
+# =============================================================================
+rationale:
+  governance_rules: |
+    Governance rules protect code quality.
+    Modifying them weakens the safeguards.
+
+  project_config: |
+    Project configuration affects how code is validated.
+    Changes must be carefully reviewed.
+
+  meta_protection: |
+    These files protect other protections.
+    This is the last line of defense against circumvention.

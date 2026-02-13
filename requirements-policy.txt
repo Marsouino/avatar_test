@@ -1,0 +1,13 @@
+# Policy-as-Code Dependencies
+# ============================
+# Installed in venv_policy/ (isolated from project venv).
+# These tools enforce the project's philosophy via static analysis.
+# They NEVER import project code — they analyze text/AST only.
+# Managed by init_project.ps1 / init_project.sh.
+
+# Code quality (pure static analysis — no project imports needed)
+ruff>=0.4.0
+semgrep>=1.0
+
+# Git hooks
+pre-commit>=3.0

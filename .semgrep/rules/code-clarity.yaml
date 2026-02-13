@@ -1,0 +1,38 @@
+# Code Clarity Rules
+# ==================
+# These rules enforce code clarity and maintainability:
+# - No legacy naming (no confusion about what's current)
+# - Explicit imports (know where things come from)
+
+rules:
+  # ============================================================
+  # ZERO LEGACY
+  # ============================================================
+
+  - id: no-legacy-naming
+    pattern-regex: (legacy|deprecated|old_|_old|_v1\b|_v2\b|_backup|Old[A-Z])
+    paths:
+      include:
+        - "*.py"
+    message: |
+      [!] Legacy naming detected
+
+      Don't keep old code around. Either:
+      - Migrate fully and delete the old version
+      - If still used, it's the current version (remove "legacy" from name)
+    languages: [python]
+    severity: WARNING
+
+  # ============================================================
+  # EXPLICIT IMPORTS
+  # ============================================================
+
+  - id: no-star-import
+    patterns:
+      - pattern: from $MODULE import *
+    message: |
+      [X] Star import hides where things come from
+
+      Use explicit imports: from $MODULE import Thing1, Thing2
+    languages: [python]
+    severity: ERROR

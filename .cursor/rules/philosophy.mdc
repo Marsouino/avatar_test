@@ -1,0 +1,195 @@
+# PHILOSOPHIE DE CODE - LECTURE OBLIGATOIRE
+
+Ces règles sont **vérifiées automatiquement par Semgrep** au moment du commit.
+Si tu génères du code qui viole ces règles, le commit sera bloqué.
+**Respecte-les dès la génération pour éviter les allers-retours.**
+
+---
+
+## RÈGLE #1 : Zéro Silent Fallback (BLOQUANT)
+
+### INTERDIT - Ne jamais générer
+
+```python
+# ❌ dict.get() avec valeur par défaut
+value = config.get("key", "default")
+timeout = params.get("timeout", 30)
+
+# ❌ or avec fallback
+name = user.name or "Anonymous"
+path = config.path or "/default/path"
+
+# ❌ getattr() avec valeur par défaut
+value = getattr(obj, "attr", "default")
+
+# ❌ hasattr() avec fallback
+if hasattr(obj, "attr"):
+    x = obj.attr
+else:
+    x = "default"
+
+# ❌ Version ternaire
+x = obj.attr if hasattr(obj, "attr") else "default"
+```
+
+### OBLIGATOIRE - Toujours générer
+
+```python
+# ✅ Accès direct (lève KeyError/AttributeError si manquant)
+value = config["key"]
+timeout = params["timeout"]
+value = obj.attr
+
+# ✅ Validation explicite avec message d'erreur clair
+if "key" not in config:
+    raise ValueError("[X] config.key is required")
+value = config["key"]
+
+# ✅ Pour les attributs
+if not hasattr(obj, "attr"):
+    raise ValueError("[X] obj.attr is required")
+value = obj.attr
+```
+
+---
+
+## RÈGLE #2 : Zéro Exception Swallowing (BLOQUANT)
+
+### INTERDIT - Ne jamais générer
+
+```python
+# ❌ Bare except
+try:
+    risky()
+except:
+    pass
+
+# ❌ Broad except avec pass
+try:
+    risky()
+except Exception:
+    pass
+
+# ❌ Except qui retourne une valeur par défaut
+try:
+    value = load_file()
+except:
+    value = "default"  # Masque l'erreur!
+```
+
+### OBLIGATOIRE - Toujours générer
+
+```python
+# ✅ Exception spécifique avec re-raise
+try:
+    value = load_file()
+except FileNotFoundError as e:
+    raise RuntimeError(f"[X] Config file missing: {e}") from e
+
+# ✅ Si vraiment optionnel, documenter pourquoi
+try:
+    cache = load_cache()
+except FileNotFoundError:
+    # Cache is optional, will be created on first save
+    cache = {}
+```
+
+---
+
+## RÈGLE #3 : Zéro Legacy (WARNING)
+
+### INTERDIT
+
+```python
+# ❌ Noms avec legacy, old, deprecated
+def process_legacy(): ...
+class OldHandler: ...
+def get_data_v1(): ...
+use_legacy_mode = True
+```
+
+### OBLIGATOIRE
+
+```python
+# ✅ Un seul nom, la version actuelle
+def process(): ...
+class Handler: ...
+def get_data(): ...
+```
+
+---
+
+## RÈGLE #4 : Imports explicites (BLOQUANT)
+
+### INTERDIT
+
+```python
+# ❌ Star import
+from module import *
+```
+
+### OBLIGATOIRE
+
+```python
+# ✅ Import explicite
+from module import ClassName, function_name
+```
+
+---
+
+## RÈGLE #5 : Fail Fast
+
+### Principe
+
+Les erreurs doivent être **visibles immédiatement**, pas cachées.
+Un bug caché va corrompre silencieusement les résultats plus loin.
+
+### Application
+
+1. **Valider les inputs dès le début** de la fonction
+2. **Lever des exceptions claires** avec `[X]` prefix et message actionnable
+3. **Ne jamais retourner de valeur par défaut** pour masquer un problème
+
+```python
+# ✅ BON PATTERN
+def process_image(config: dict) -> Image:
+    # Validation immédiate
+    if "input_path" not in config:
+        raise ValueError("[X] config.input_path is required")
+    if "output_size" not in config:
+        raise ValueError("[X] config.output_size is required")
+    
+    input_path = Path(config["input_path"])
+    if not input_path.exists():
+        raise FileNotFoundError(f"[X] Input image not found: {input_path}")
+    
+    # Traitement seulement après validation
+    image = load_image(input_path)
+    return resize(image, config["output_size"])
+```
+
+---
+
+## RÉSUMÉ RAPIDE
+
+| Pattern | Interdit | Correct |
+|---------|----------|---------|
+| `dict.get("k", default)` | ❌ | `dict["k"]` |
+| `x or default` | ❌ | `if not x: raise` |
+| `getattr(o, "a", default)` | ❌ | `o.a` |
+| `except: pass` | ❌ | `except SpecificError: raise` |
+| `except: return default` | ❌ | Laisser l'exception remonter |
+| `from x import *` | ❌ | `from x import y, z` |
+
+---
+
+## NOTE IMPORTANTE
+
+Ces règles sont appliquées par les fichiers `.semgrep/rules/*.yaml` (`fail-fast.yaml`, `code-clarity.yaml`, etc.).
+**Tout code violant ces règles sera bloqué au commit.**
+
+Si tu n'es pas sûr, demande-toi :
+> "Si cette valeur est manquante, est-ce un bug ou une situation normale ?"
+
+- Bug → Fail fast avec exception
+- Normal → Documenter explicitement pourquoi c'est optionnel

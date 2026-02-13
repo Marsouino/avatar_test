@@ -1,0 +1,38 @@
+# Virtual Environment Architecture
+# ==================================
+# Maps each module to its venv and test directory.
+# Used by scripts/run_all_tests.py to run pytest in the correct venv.
+#
+# Each module is tested in isolation in its own venv.
+# Static analysis (semgrep, ruff, mypy) runs from venv_policy/ and doesn't need this.
+#
+# INSTRUCTIONS: Add entries as your project grows.
+# Remove the example entries and add your own.
+
+# Note: venv_policy/ is managed separately by init_project and is not listed here.
+# It contains static analysis tools (semgrep, ruff, mypy, pre-commit) only.
+
+# Default project module — start here, split into multiple as deps diverge
+modules:
+  core:
+    venv: venv                          # Project venv
+    requirements: requirements.txt
+    tests: tests/unit                   # Test directory for this module
+
+  # Examples for multi-venv projects (uncomment and adapt):
+  #
+  # pose:
+  #   venv: venv_pose
+  #   requirements: modules/pose/requirements.txt
+  #   tests: tests/unit/pose
+  #
+  # generation:
+  #   venv: venv_generation
+  #   requirements: modules/generation/requirements.txt
+  #   tests: tests/unit/generation
+  #
+  # upscaling:
+  #   venv: venv_upscaling
+  #   requirements: modules/upscaling/requirements.txt
+  #   tests: tests/unit/upscaling
+
