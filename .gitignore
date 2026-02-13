@@ -36,7 +36,8 @@ desktop.ini
 # Project specific
 *.log
 output/
-outputs/
+outputs/*
+!outputs/.gitkeep
 temp/
 
 # AnimateDiff — gros binaires (ne pas versionner)
