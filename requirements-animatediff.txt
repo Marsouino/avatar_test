@@ -1,5 +1,9 @@
 # AnimateDiff SDXL — dépendances standalone
 # Versions PyTorch alignées avec config/hardware.yaml (local: 2.10.0)
+#
+# GPU local : installer PyTorch avec CUDA AVANT ce fichier, sinon pip prend le build CPU
+#   pip install torch==2.10.0 torchvision torchaudio --index-url https://download.pytorch.org/whl/cu128
+# Puis : pip install -r requirements-animatediff.txt
 
 torch==2.10.0
 torchvision
@@ -9,9 +13,6 @@ diffusers>=0.27.0
 transformers
 accelerate
 safetensors
-
-# VRAM: attention mémoire efficace (recommandé pour GPU local)
-xformers
 
 # Config YAML
 PyYAML>=6.0

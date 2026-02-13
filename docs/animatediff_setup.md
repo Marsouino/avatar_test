@@ -29,6 +29,14 @@ python -m venv venv
 pip install -r requirements-animatediff.txt
 ```
 
+**GPU local :** Un `pip install -r requirements-animatediff.txt` seul peut installer PyTorch en **CPU**, ce qui fait échouer xformers. Il faut d’abord installer PyTorch avec CUDA, puis le reste. Si tu as déjà tout installé en CPU, exécute :
+
+```powershell
+pip uninstall torch torchvision torchaudio xformers -y
+pip install torch==2.10.0 torchvision torchaudio --index-url https://download.pytorch.org/whl/cu128
+pip install -r requirements-animatediff.txt
+```
+
 Les versions de PyTorch dans `requirements-animatediff.txt` sont alignées avec `config/hardware.yaml` pour l’environnement local.
 
 ## Configuration des chemins
