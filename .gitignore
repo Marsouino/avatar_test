@@ -36,7 +36,12 @@ desktop.ini
 # Project specific
 *.log
 output/
+outputs/
 temp/
+
+# AnimateDiff — gros binaires (ne pas versionner)
+models/checkpoints/*.safetensors
+models/motion_adapter/*.safetensors
 tmp/
 .cache/
 

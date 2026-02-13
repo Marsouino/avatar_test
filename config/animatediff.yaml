@@ -1,0 +1,6 @@
+# AnimateDiff SDXL — chemins projet (ne pas modifier config/hardware.yaml)
+# Référence: docs/ai_codev/ANIMATEDIFF_IMPLEMENTATION_PLAN.md
+
+checkpoint_path: "models/checkpoints/juggernautXL_v10_nsfw.safetensors"
+motion_adapter_path: "models/motion_adapter"
+output_dir: "outputs"

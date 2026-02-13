@@ -1,0 +1,14 @@
+# AnimateDiff SDXL — dépendances standalone
+# Versions PyTorch alignées avec config/hardware.yaml (local: 2.10.0)
+
+torch==2.10.0
+torchvision
+torchaudio
+
+diffusers>=0.27.0
+transformers
+accelerate
+safetensors
+
+# VRAM: attention mémoire efficace (recommandé pour GPU local)
+xformers
